@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Personal Tasks</title>
+<style>
+  body { font-family: sans-serif; margin: 20px; }
+  .task { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 4px; }
+  .task-header { display: flex; justify-content: space-between; align-items: center; }
+  .task-title { font-weight: bold; font-size: 1.1em; }
+  .task-meta { color: #666; font-size: 0.9em; }
+  .checklist { margin: 10px 0; }
+  .checklist-item { display: flex; align-items: center; margin: 5px 0; }
+  .checklist-item input[type=\"checkbox\"] { margin-right: 8px; }
+  .add-task { background: #4CAF50; color: white; border: none; padding: 10px 20px; cursor: pointer; }
+  .add-task:hover { background: #45a049; }
+  input[type=\"text\"], input[type=\"textarea\"] { padding: 8px; width: 100%; box-sizing: border-box; }
+  #new-task-form { background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0; }
+  .filters { margin: 20px 0; padding: 10px; background: #eee; border-radius: 4px; }
+  .filters label { margin-right: 15px; }
+  .filters select, .filters input { padding: 5px; margin-right: 10px; }
+</style>
+</head>
+<body>
+<h1>Personal Tasks</h1>
+
+<div class=\"filters\">
+  <label>Project: <select id=\"filter-project\"><option value=\"\">All</option></select></label>
+  <label>Status: <select id=\"filter-status\"><option value=\"\">All</option><option value=\"todo\">Todo</option><option value=\"in-progress\">In Progress</option><option value=\"done\">Done</option></select></label>
+  <label>Priority: <select id=\"filter-priority\"><option value=\"\">All</option><option value=\"low\">Low</option><option value=\"medium\">Medium</option><option value=\"high\">High</option></select></label>
+  <button id=\"apply-filters\">Apply Filters</button>
+</div>
+
+<div id=\"tasks-list\">Loading...</div>
+
+<div id=\"new-task-form\">
+  <h2>New Task</h2>
+  <form id=\"task-form\">
+    <input type=\"text\" id=\"task-title\" placeholder=\"Title\" required><br><br>
+    <textarea id=\"task-text\" rows=\"3\" placeholder=\"Notes / Description\"></textarea><br><br>
+    <label>Project: <input type=\"text\" id=\"task-project\" placeholder=\"Project (optional)\"></label><br><br>
+    <label>Priority: 
+      <select id=\"task-priority\">
+        <option value=\"medium\">Medium</option>
+        <option value=\"low\">Low</option>
+        <option value=\"high\">High</option>
+      </select>
+    </label><br><br>
+    <label>Status:
+      <select id=\"task-status\">
+        <option value=\"todo\">Todo</option>
+        <option value=\"in-progress\">In Progress</option>
+        <option value=\"done\">Done</option>
+      </select>
+    </label><br><br>
+    <button type=\"submit\" class=\"add-task\">Add Task</button>
+  </form>
+</div>
+
+<script>
+// Simple API helper using the /rpc endpoint (proxy to backend.handle_call)
+async function callTool(toolName, args = {}) {
+  const response = await fetch('/api/plugins/personal-tasks/rpc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      method: toolName,
+      ...args
+    })
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  }
+  return response.json();
+}
+
+async function loadTasks() {
+  const project = document.getElementById('filter-project').value;
+  const status = document.getElementById('filter-status').value;
+  const priority = document.getElementById('filter-priority').value;
+  const args = {};
+  if (project) args.project = project;
+  if (status) args.status = status;
+  if (priority) args.priority = priority;
+  args.limit = 100;
+  try {
+    const res = await callTool('pt_list', args);
+    renderTasks(res.tasks || []);
+    // Update filter dropdowns with projects from tasks? For simplicity skip.
+  } catch (err) {
+    document.getElementById('tasks-list').innerHTML = `<p style=\"color:red;\">Error loading tasks: ${err}</p>`;
+  }
+}
+
+function renderTasks(tasks) {
+  const container = document.getElementById('tasks-list');
+  if (tasks.length === 0) {
+    container.innerHTML = '<p>No tasks found. Add a new task above!</p>';
+    return;
+  }
+  container.innerHTML = ''; // clear
+  tasks.forEach(task => {
+    const div = document.createElement('div');
+    div.className = 'task';
+    div.dataset.taskId = task.id;
+    div.innerHTML = `
+      <div class=\"task-header\">
+        <span class=\"task-title\">${escapeHtml(task.title)}</span>
+        <span class=\"task-meta\">${task.status || ''} ${task.priority || ''} ${task.project || ''}</span>
+      </div>
+      ${task.text ? `<p>${escapeHtml(task.text)}</p>` : ''}
+      <div class=\"checklist\">
+        ${task.checklist && task.checklist.length > 0 ? 
+          task.checklist.map((item, idx) => `
+            <label class=\"checklist-item\">
+              <input type=\"checkbox\" ${item.checked ? 'checked' : ''} data-item-index=\"${idx+1}\">
+              <span>${escapeHtml(item.text)}</span>
+            </label>
+          `).join('') : ''
+        }
+      </div>
+    `;
+    // Add event listeners for checkboxes
+    const checkboxes = div.querySelectorAll('.checklist-item input[type=\"checkbox\"]');
+    checkboxes.forEach((cb, idx) => {
+      cb.addEventListener('change', async () => {
+        try {
+          await callTool('pt_set_task', {
+            id: task.id,
+            revision: task.revision,
+            index: idx + 1,
+            checked: cb.checked
+          });
+          // Refresh this task to get updated revision etc.
+          const updated = await callTool('pt_read', { id: task.id });
+          // Replace div with updated task (could mutate in place but simpler to reload list)
+          loadTasks();
+        } catch (e) {
+          alert(`Failed to update checklist: ${e}`);
+          cb.checked = !cb.checked; // revert
+        }
+      });
+    });
+    container.appendChild(div);
+  });
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Event listeners
+document.getElementById('task-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const title = document.getElementById('task-title').value.trim();
+  const text = document.getElementById('task-text').value.trim();
+  if (!title) {
+    alert('Title is required');
+    return;
+  }
+  try {
+    await callTool('pt_create', {
+      title: title,
+      text: text,
+      project: document.getElementById('task-project').value || undefined,
+      priority: document.getElementById('task-priority').value,
+      status: document.getElementById('task-status').value
+    });
+    // Clear form
+    e.target.reset();
+    // Reload tasks
+    loadTasks();
+  } catch (err) {
+    alert(`Failed to add task: ${err}`);
+  }
+});
+
+document.getElementById('apply-filters').addEventListener('click', loadTasks);
+
+// Initial load
+loadTasks();
+</script>
+</body>
+</html>

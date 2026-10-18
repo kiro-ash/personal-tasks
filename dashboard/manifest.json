@@ -1,0 +1,11 @@
+{
+  "name": "personal-tasks",
+  "label": "Personal Tasks",
+  "description": "Personal task storage with checklists, priorities, sub-tasks, and projects.",
+  "version": "0.1.0",
+  "api": "plugin_api.py",
+  "tab": {
+    "path": "/personal-tasks",
+    "position": "after:dashboard"
+  }
+}

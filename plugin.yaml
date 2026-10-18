@@ -1,0 +1,17 @@
+name: personal_tasks
+version: 0.1.0
+description: Personal task storage with checklists, priorities, sub-tasks, and projects.
+author: kiro-ash
+license: MIT
+requires_hermes: ">=0.21.5"
+provides_tools:
+  - pt_list
+  - pt_read
+  - pt_create
+  - pt_update
+  - pt_delete
+  - pt_set_task
+provides_hooks: []
+provides_middleware: []
+requires_env: []
+tags: [desktop, notes, todo, personal]

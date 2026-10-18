@@ -1,0 +1,92 @@
+[
+  {
+    "name": "pt_list",
+    "description": "List personal tasks with optional filter by project, status, priority. Returns task summaries.",
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project": { "type": "string" },
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "limit": { "type": "integer", "description": "1–100, default 20" },
+        "offset": { "type": "integer", "description": "Default 0" }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "pt_read",
+    "description": "Read a personal task by ID, including title, notes, checklist items, sub-tasks, project, priority, status.",
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" }
+      },
+      "required": ["id"]
+    }
+  },
+  {
+    "name": "pt_create",
+    "description": "Create a new personal task with title, notes, optional project, priority, status.",
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" },
+        "text": { "type": "string" },
+        "project": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "status": { "type": "string", "enum": ["todo", "in-progress", "done"] }
+      },
+      "required": ["title", "text"]
+    }
+  },
+  {
+    "name": "pt_update",
+    "description": "Update a personal task by ID. Allows changing title, text, project, priority, status. Requires revision to prevent lost updates.",
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "revision": { "type": "integer" },
+        "title": { "type": "string" },
+        "text": { "type": "string" },
+        "project": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "status": { "type": "string", "enum": ["todo", "in-progress", "done"] }
+      },
+      "required": ["id", "revision"]
+    }
+  },
+  {
+    "name": "pt_delete",
+    "description": "Delete a personal task by ID. Requires revision to prevent lost updates.",
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "revision": { "type": "integer" }
+      },
+      "required": ["id", "revision"]
+    }
+  },
+  {
+    "name": "pt_set_task",
+    "description": "Check or uncheck a checklist item within a task by its index (1-based). Requires task ID and revision.",
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "revision": { "type": "integer" },
+        "index": { "type": "integer", "description": "1-based index of checklist item" },
+        "checked": { "type": "boolean" }
+      },
+      "required": ["id", "revision", "index", "checked"]
+    }
+  }
+]
